@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<kbpslotfill>
+  <query id="SF_ENG_003">
+    <name>Jo Ann Davis</name>
+    <docid>NYT_ENG_20080101.0037.LDC2009T13</docid>
+    <beg>4150</beg>
+    <end>4161</end>
+    <enttype>PER</enttype>
+    <nodeid>E0471829</nodeid>
+    <ignore>per:date_of_birth per:date_of_death per:city_of_birth per:city_of_death per:religion per:stateorprovince_of_birth per:stateorprovince_of_death per:age</ignore>
+  </query>
+</kbpslotfill>

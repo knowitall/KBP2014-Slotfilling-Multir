@@ -20,6 +20,11 @@ import edu.stanford.nlp.dcoref.Document
 import edu.stanford.nlp.dcoref.RuleBasedCorefMentionFinder
 import edu.stanford.nlp.dcoref.Dictionaries
 import collection.JavaConverters._
+import edu.washington.multirframework.corpus.SentNamedEntityLinkingInformation.NamedEntityLinkingAnnotation
+import java.io.BufferedWriter
+import java.io.BufferedWriter
+import java.io.FileWriter
+import java.io.FileWriter
 
 object RunKBPMultirExtractor {
   
@@ -55,31 +60,44 @@ object RunKBPMultirExtractor {
 		  val entityRelevantDocSerialization = {
 		    val f = new File(Args(3))
 		    if(f.exists()){
-		     QuerySetSerialization.getRevelantDocIdMap(Args(2))
+		     QuerySetSerialization.getRevelantDocIdMap(Args(3))
 		    }
 		    else{
 		      // make this map and write it out
 		      //val m = getRelevantDocuments(queries,solr).toMap
 		      val qm = SolrHelper.getRelevantDocuments(queries)
 		      val qidMap = qm.toList.map(f => (f._1.id,f._2)).toMap
-		      QuerySetSerialization.writeRelevantDocIdMap(qidMap,Args(2))
-		      qm 
+		      QuerySetSerialization.writeRelevantDocIdMap(qidMap,Args(3))
+		      qidMap
 		    }
 		  }
+		 
 		  
+		  val multirExtractor = new MultiModelMultirExtractorVersion1()
+		  val bw = new BufferedWriter(new FileWriter(new File(Args(4))))
 		  //extract
-//		  queries.sortBy(f => entityRelevantDocSerialization.get())
-//		  for(q <- queries)
-		  
-		  val multirCorpus = 
-		  if(Args.size > 4){
-		    new Corpus(Args(4),cis,true)
+		  val sortedQueries = queries.sortBy(f => entityRelevantDocSerialization.get(f.id).size)
+		  for(query <- sortedQueries){
+		      val documents = processDocuments(entityRelevantDocSerialization.values.flatten.toSet)
+		      for(document <- documents){
+		        if(document.isDefined){
+		          val extractions = multirExtractor.extract(document.get, query).asScala
+		          for(e <- extractions){
+		            println(e)
+		            val docText = document.get.get(classOf[CoreAnnotations.TextAnnotation])
+		            val minIndex = math.min(e.getArg1().getStartOffset(),e.getArg2().getStartOffset())
+		            val maxIndex = math.max(e.getArg2().getEndOffset(),e.getArg1().getEndOffset())
+		            println("Sentence = " +docText.subSequence(minIndex,maxIndex))
+		            bw.write(e + "\n")
+		            bw.write("Sentence = " +docText.subSequence(minIndex,maxIndex)+"\n")
+		          }
+		        }
+		      }
 		  }
-		  else{
-		    //process documents and create new corpus
-		    processDocumentsStanford(entityRelevantDocSerialization.values.flatten.toSet)
-		  }
+		  bw.close()
 	  }
+	  
+	  
 	  //mode 1 is for using a fully processed document corpus
 	  else if(mode == 1){
 	    val multirCorpus = new Corpus(Args(2),cis,true)
@@ -168,31 +186,98 @@ object RunKBPMultirExtractor {
     }
   }
   
-  def processDocumentsStanford(documents: Set[String]){
+  def processDocumentsStanford(documents: Set[String]):  List[Option[Annotation]]  ={
     println("Number of docs = " + documents.size)
        var start :Long = 0
        var end: Long = 0    
-    for(doc <- documents.take(3)){
-
+    for(doc <- documents.toList) yield{
       start = System.currentTimeMillis()
-
+      val a =processDocument(doc)
+      end = System.currentTimeMillis()
+      println("Document took " + (end-start) + " milliseconds")
+      a
+    }
+  }
+  
+  def processDocuments(documents: Set[String]): List[Option[Annotation]] = {
+	 println("Number of docs = " + documents.size)
+	 var start :Long = 0
+	 var end: Long = 0    
+    for(doc <- documents.toList) yield{
+      start = System.currentTimeMillis()
+      val a =processDocument(doc)
+      end = System.currentTimeMillis()
+      println("Document took " + (end-start) + " milliseconds")
+      a
+    }
+  }
+  
+  def cjParseDocument(docName: String): Option[Annotation] = {
       try{
-        val rawDoc = SolrHelper.getRawDoc(doc)
-        println(doc)
-        val processedDoc = new Annotation(rawDoc)
-        annotatorHelper.getCorefPipeline().annotate(processedDoc)
-        println("preprocessed and parsed document")
-        println("DOC STIRNG = " + processedDoc.get(classOf[CoreAnnotations.TextAnnotation]))
-        println("DOC COREF = " + processedDoc.get(classOf[CorefCoreAnnotations.CorefChainAnnotation]))
+        val rawDoc = SolrHelper.getRawDoc(docName)
+        val preprocessedAndParsedDoc = CorpusPreprocessing.getTestDocumentFromRawString(rawDoc,docName)
+        println("Document was cj parsed")
+        Some(preprocessedAndParsedDoc)
       }
       catch{
         case e: Exception => e.printStackTrace()
+        None
       }
-      end = System.currentTimeMillis()
-      println("Document took " + (end-start) + " milliseconds")
-      
-    }
+  }
+  
+  def linkDocument(docName: String): Option[Annotation] ={
+    try{
+        val rawDoc = SolrHelper.getRawDoc(docName)
+        val processedDoc = new Annotation(rawDoc)
+        println("Document was linked")
+        Some(processedDoc)
+      }
+      catch{
+        case e: Exception => e.printStackTrace()
+        None
+      }
+  }
+  
+  def processDocument(docName: String) : Option[Annotation]  ={
+     try{
+         println("Processing document " +docName)
+    	 val stanfordDoc = stanfordProcessDocument(docName)
+    	 val cjParsedDoc = cjParseDocument(docName)
+    	 val linkedDoc = linkDocument(docName)
+    	 if(stanfordDoc.isDefined && cjParsedDoc.isDefined && linkedDoc.isDefined){
+    	   Some(joinAnnotations(stanfordDoc.get,cjParsedDoc.get,linkedDoc.get))
+    	 }
+    	 else{
+    	   None
+    	 }
+      }
+      catch{
+        case e: Exception => e.printStackTrace()
+        None
+      }
+  }
+  
+  def joinAnnotations(stanfordDoc: Annotation, cjParsedDoc: Annotation, linkedDoc: Annotation) : Annotation = {
     
+    //add coref annotations to cjParsedDoc
+    cjParsedDoc.set(classOf[CorefCoreAnnotations.CorefChainAnnotation],stanfordDoc.get(classOf[CorefCoreAnnotations.CorefChainAnnotation]))
+    cjParsedDoc.set(classOf[NamedEntityLinkingAnnotation],linkedDoc.get(classOf[NamedEntityLinkingAnnotation]))
+
+    cjParsedDoc
+  }
+  
+  def stanfordProcessDocument(docName: String) : Option[Annotation] = {
+      try{
+        val rawDoc = SolrHelper.getRawDoc(docName)
+        val processedDoc = new Annotation(rawDoc)
+        annotatorHelper.getCorefPipeline().annotate(processedDoc)
+        println("Document was Stanford Annotated")
+        Some(processedDoc)
+      }
+      catch{
+        case e: Exception => e.printStackTrace()
+        None
+      }
   }
   
   def setIndices (doc: Annotation){

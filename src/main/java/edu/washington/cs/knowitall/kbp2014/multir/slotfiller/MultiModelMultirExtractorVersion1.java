@@ -15,7 +15,6 @@ public class MultiModelMultirExtractorVersion1 extends MultiModelMultirExtractor
 		sigs.add(FigerAndNERTypeSignaturePERLOCSententialInstanceGeneration.getInstance());
 		modelFilePaths.add("/projects/WebWare6/Multir/MultirSystem/files/models/Baseline-ORGPER-Multir");
 		modelFilePaths.add("/projects/WebWare6/Multir/MultirSystem/files/models/Baseline-PERPER-Multir");
-		modelFilePaths.add("/projects/WebWare6/Multir/MultirSystem/files/models/Baseline-PERLOC-Multir");
-		
+		modelFilePaths.add("/projects/WebWare6/Multir/MultirSystem/files/models/Baseline-PERLOC-Multir");	
 	}
 }

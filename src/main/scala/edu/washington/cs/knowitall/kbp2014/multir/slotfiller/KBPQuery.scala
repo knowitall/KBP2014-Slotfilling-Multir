@@ -9,6 +9,7 @@ case class KBPQuery (val id: String, val name: String, val doc: String,
   def aliases():List[String] = name :: List[String]()
   
   override def toString():String = id + "\t" + name
+  
 }
 
 object KBPQuery {
