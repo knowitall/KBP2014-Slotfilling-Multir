@@ -17,6 +17,7 @@ import edu.washington.multirframework.argumentidentification.ArgumentIdentificat
 import edu.washington.multirframework.argumentidentification.SententialInstanceGeneration;
 import edu.washington.multirframework.corpus.CorpusInformationSpecification.SentDocNameInformation.SentDocName;
 import edu.washington.multirframework.corpus.CorpusInformationSpecification.SentGlobalIDInformation.SentGlobalID;
+import edu.washington.multirframework.corpus.SentOffsetInformation.SentStartOffset;
 import edu.washington.multirframework.data.Argument;
 import edu.washington.multirframework.featuregeneration.FeatureGenerator;
 
@@ -38,8 +39,6 @@ public abstract class MultiModelMultirExtractor {
 		List<Extraction> extractions = new ArrayList<>();
 
 		List<Pair<SententialInstanceGeneration,DocumentExtractor>> sigModelPairs = getSigModelPairs(q);
-		
-		
 		List<CoreMap> sentences = doc.get(CoreAnnotations.SentencesAnnotation.class);
 		for(CoreMap s : sentences){
 			List<Argument> arguments = ai.identifyArguments(doc,s);
@@ -55,6 +54,8 @@ public abstract class MultiModelMultirExtractor {
 						//add new extraction
 						Argument arg1 = sententialPair.first;
 						Argument arg2 = sententialPair.second;
+						arg1 = new Argument(arg1.getArgName(),s.get(SentStartOffset.class)+arg1.getStartOffset(),s.get(SentStartOffset.class)+arg1.getEndOffset());
+						arg2 = new Argument(arg2.getArgName(),s.get(SentStartOffset.class)+arg2.getStartOffset(),s.get(SentStartOffset.class)+arg2.getEndOffset());
 						String arg1Link = null;
 						String arg2Link = null;
 						String arg1BestMention = null;
